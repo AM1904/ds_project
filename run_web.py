@@ -1,0 +1,36 @@
+# -*- coding: utf-8 -*-
+"""
+CampusGrid Web Dashboard Launcher
+Starts the local Flask backend and automatically opens the user's browser.
+"""
+import os
+import sys
+import webbrowser
+import threading
+import time
+
+PORT = 5050
+URL = f"http://localhost:{PORT}"
+
+
+def open_browser():
+    time.sleep(1.2)
+    print(f"\n>> Opening browser at: {URL}\n")
+    try:
+        webbrowser.open(URL)
+    except Exception as e:
+        print(f"Could not open browser automatically: {e}")
+
+
+if __name__ == "__main__":
+    print("=" * 65)
+    print("  CAMPUSGRID // CLASH-FREE TIMETABLE & DSA ENGINE")
+    print("=" * 65)
+    print(f"  Starting web dashboard at {URL}")
+    print("  Press Ctrl+C in this terminal to stop the server.")
+    print("=" * 65)
+
+    threading.Thread(target=open_browser, daemon=True).start()
+
+    from web_server import app
+    app.run(host="0.0.0.0", port=PORT, debug=False)
