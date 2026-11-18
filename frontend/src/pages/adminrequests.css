@@ -1,0 +1,16 @@
+.ar-filter { max-width: 100%; overflow-x: auto; }
+.ar-list { display: grid; gap: var(--sp-4); grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 1000px) { .ar-list { grid-template-columns: 1fr 1fr; } }
+.ar-card { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.ar-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-3); }
+.ar-name { margin: 0; font-size: var(--fs-lg); }
+.ar-blocks { display: grid; gap: var(--sp-4); grid-template-columns: 1fr; }
+@media (min-width: 480px) { .ar-blocks { grid-template-columns: 1fr 1fr; } }
+.ar-block p { margin: 0; overflow-wrap: anywhere; }
+.ar-reason { margin: 0; padding-left: var(--sp-3); border-left: 3px solid var(--line-strong); color: var(--ink-2); overflow-wrap: anywhere; }
+.ar-admin { margin: 0; overflow-wrap: anywhere; }
+.ar-label { font-size: var(--fs-sm); font-weight: 500; color: var(--ink-3); margin: 0; }
+/* Note and decision on one row: the note is optional for approve, required for reject */
+.ar-actions { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: end; border-top: 1px solid var(--line); padding-top: var(--sp-4); }
+.ar-actions .field { flex: 1 1 220px; }
+.ar-actions .row { flex: none; }

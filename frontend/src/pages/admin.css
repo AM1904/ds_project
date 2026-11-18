@@ -1,0 +1,35 @@
+.adm-toolbar { display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-5); align-items: center; justify-content: space-between; }
+.adm-controls { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
+.adm-controls .select { width: auto; min-width: 140px; min-height: 36px; font-size: var(--fs-sm); }
+.adm-actions { display: flex; gap: var(--sp-2); flex-wrap: nowrap; }
+.adm-clash { display: block; margin-top: var(--sp-1); font-size: var(--fs-sm); color: var(--danger); }
+
+/* Class form: plain two-column grid, shared by the new-class page and the edit dialog */
+.adm-form { display: grid; gap: var(--sp-5); }
+.adm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
+.adm-span { grid-column: 1 / -1; }
+@media (max-width: 560px) { .adm-grid { grid-template-columns: 1fr; } }
+
+.adm-new { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-5); align-items: start; }
+@media (max-width: 900px) { .adm-new { grid-template-columns: 1fr; } }
+.adm-preview { display: grid; gap: var(--sp-3); }
+.adm-slots { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-2); }
+.adm-slot { display: grid; grid-template-columns: 150px 1fr; gap: var(--sp-3); align-items: center; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.adm-slot-time { font-size: var(--fs-sm); font-weight: 500; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm-slot-free { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); flex-wrap: wrap; }
+.adm-slot-body, .adm-slot-class { display: grid; gap: 2px; min-width: 0; }
+.adm-slot-class + .adm-slot-class { margin-top: var(--sp-2); }
+@media (max-width: 480px) { .adm-slot { grid-template-columns: 1fr; } }
+
+/* List view: grouped by day, whole row opens the editor, no per-row buttons */
+.adm-list .day-row th { background: var(--surface-2); color: var(--ink); font-size: var(--fs-sm); font-weight: 600; padding: var(--sp-2) var(--sp-4); border-top: 1px solid var(--line); }
+.adm-list tbody:first-of-type .day-row th { border-top: 0; }
+.adm-list .day-row th span { margin-left: var(--sp-2); font-weight: 400; color: var(--ink-3); }
+.adm-list td { padding-top: var(--sp-2); padding-bottom: var(--sp-2); }
+.adm-list tr.is-click { cursor: pointer; }
+.adm-list tr.is-click:hover td { background: var(--surface-2); }
+.adm-list tr.row-clash:hover td { background: var(--danger-bg); }
+.row-link { background: none; border: 0; padding: 0; font-weight: 500; color: var(--ink); cursor: pointer; text-align: left; }
+.row-link:hover { color: var(--accent); text-decoration: underline; }
+.adm-clash-pill { margin-left: var(--sp-2); }
+.adm-list tr.is-past td { color: var(--ink-3); }
