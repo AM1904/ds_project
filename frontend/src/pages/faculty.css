@@ -1,0 +1,22 @@
+.fac-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: var(--sp-5); align-items: start; }
+.fac-cols-single { grid-template-columns: minmax(0, 640px); }
+@media (max-width: 820px) { .fac-cols { grid-template-columns: minmax(0, 1fr); } }
+.fac-list { display: grid; gap: var(--sp-2); list-style: none; margin: 0; padding: 0; }
+.fac-summary { padding: var(--sp-3) var(--sp-4); border-radius: var(--radius-md); background: var(--surface-2); display: grid; gap: 2px; }
+.fac-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
+@media (max-width: 560px) { .fac-two { grid-template-columns: minmax(0, 1fr); } }
+.fac-main { display: grid; gap: 2px; min-width: 240px; }
+.fac-note { margin-top: var(--sp-1); padding: var(--sp-1) var(--sp-2); border-radius: var(--radius-sm); background: var(--info-bg); color: var(--ink); font-size: var(--fs-sm); }
+
+/* Phones: each sent request becomes a stacked row instead of a four-column table */
+@media (max-width: 640px) {
+  .fac-table thead { display: none; }
+  .fac-table tr { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-2) var(--sp-3); padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--line); }
+  .fac-table tr:first-child { border-top: 0; }
+  .fac-table td { display: block; padding: 0; border: 0; }
+  .fac-table td:nth-child(2) { order: 1; }
+  .fac-table td:nth-child(3) { order: 2; text-align: right; }
+  .fac-table td.fac-main { order: 3; grid-column: 1 / -1; min-width: 0; }
+  .fac-table td:nth-child(4) { order: 4; grid-column: 1 / -1; }
+  .fac-table td:nth-child(4):empty { display: none; }
+}

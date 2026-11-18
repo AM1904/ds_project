@@ -7,7 +7,7 @@ An end-to-end Data Structures and Algorithms capstone project that solves univer
 ## 🌟 Highlights & Features
 
 - **Algorithmic Engine**: Implements custom data structures from scratch (Linked Lists, Stacks, Queues, BST, Conflict Graphs) and algorithms (Merge/Quick Sort, Binary Search, Greedy Activity Selection, 0/1 Knapsack DP, and CSP Backtracking).
-- **Interactive Web Portal**: Built using Flask and Vanilla HTML5/CSS/JavaScript with glassmorphic modern UI and responsive layouts.
+- **Interactive Web Portal**: Flask API plus a React 19 + TypeScript + Vite frontend (Inter type, a neutral grey system with one accent, URL-based routing so refresh keeps your place).
 - **3-Point Clash Detection Engine**: Real-time validation preventing Classroom clashes, Teacher clashes, and Section clashes.
 - **Faculty Reschedule & Extra-Hour Workflow**: Faculty can request timeslot or classroom changes; once an Admin approves a request, changes instantly propagate across all student and faculty timetables.
 - **Dual Database Architecture**: 
@@ -20,8 +20,8 @@ An end-to-end Data Structures and Algorithms capstone project that solves univer
 
 ```
 ┌─────────────────────────────────┐
-│     Frontend (SPA: Web UI)      │  HTML5 + Modern CSS + JavaScript
-│  (Admin, Faculty & Student)     │  Subject Pickers, Clash Alerts, Requests
+│     Frontend (React SPA)        │  React 19 + TypeScript + Vite
+│  (Admin, Faculty & Student)     │  Timetable grid, Clash Alerts, Requests
 └────────────────▲────────────────┘
                  │ REST API (JSON)
 ┌────────────────▼────────────────┐
@@ -73,10 +73,10 @@ DS_Project/
 │   ├── queries.sql               # Clash-Detection & Analytical Queries
 │   ├── db_manager.py             # Python Database Access Layer & DS Bridges
 │   └── setup_db.py               # Database Verification & Setup Script
-├── web/                          # Web Application Frontend
-│   ├── index.html                # Responsive Single Page Application
-│   ├── styles.css                # Custom CSS Design System
-│   └── app.js                    # UI logic, REST API calls, dynamic views
+├── frontend/                     # React + TypeScript + Vite frontend
+│   ├── src/styles/               # Design tokens + shared styles
+│   ├── src/components|context|lib/  # Shell, WeekGrid, providers, typed API client
+│   └── src/pages/                # Login, Student, Faculty, Admin pages
 ├── portal_data.db                # SQLite database with pre-seeded accounts & schedule
 ├── web_server.py                 # Flask REST API backend & static file server
 ├── run_web.py                    # One-click web portal launcher
@@ -126,15 +126,17 @@ pip install -r requirements.txt
 ```
 
 ### 2. Launch the Web Timetable Portal
-Start the web server:
+Node.js 20+ is needed once to build the UI (`run_web.py` does it on the first run):
 ```bash
 python run_web.py
 ```
-Or directly:
-```bash
-python web_server.py
-```
 Open **[http://localhost:5050](http://localhost:5050)** in your browser.
+
+For frontend development (hot reload on :5173, proxying `/api` to Flask):
+```bash
+python web_server.py            # terminal 1
+cd frontend && npm run dev      # terminal 2
+```
 
 ### 3. Run the Algorithmic CLI Demos
 To run the interactive CLI control panel:
