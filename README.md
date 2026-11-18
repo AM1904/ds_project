@@ -138,6 +138,8 @@ python web_server.py            # terminal 1
 cd frontend && npm run dev      # terminal 2
 ```
 
+All run, build, dev-server and troubleshooting commands are in [RUNNING.md](RUNNING.md).
+
 ### 3. Run the Algorithmic CLI Demos
 To run the interactive CLI control panel:
 ```bash
