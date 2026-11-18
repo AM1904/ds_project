@@ -17,3 +17,15 @@ env/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Project reports and report-generation scripts/assets
+*.docx
+PROJECT_REPORT_60_PAGES.md
+build_full_report.py
+export_to_word.py
+generate_mca_report.py
+report_front_matter.py
+report_modules_phases.py
+report_screens_code.py
+report_specs_workflow.py
+university_logo.jpeg
