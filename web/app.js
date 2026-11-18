@@ -16,6 +16,14 @@ let adminCurrentDate = '';
 let adminCurrentSection = 'MCA A';
 let facultyCurrentDate = '';
 let selectedClassForChange = null;
+let studentCurrentWeekDate = '';
+let facultyCurrentWeekDate = '';
+let adminCurrentWeekDate = '';
+let adminCurrentWeeklySection = 'ALL';
+let adminCurrentWeeklyFaculty = '';
+let studentCurrentViewMode = 'weekly';
+let facultyCurrentViewMode = 'weekly';
+let adminCurrentTab = 'weekly';
 
 // ---------------------------------------------------------------------------
 // INITIALIZATION
@@ -199,9 +207,13 @@ async function enterPortal() {
   updateHeaderUI();
   setupNavigation();
   setupProfileModal();
+  setupWeeklyNavigators();
+  setupEditScheduleModal();
 
   // Load shared metadata
   await Promise.all([loadSubjects(), loadClassrooms(), loadTimeslots(), loadFacultyList()]);
+  populateEditModalOptions();
+  populateAdminWeeklyFacultyFilter();
 
   // Route to the appropriate role screen
   const role = currentUser.role;
@@ -324,7 +336,7 @@ async function loadTimeslots() {
 }
 
 function populateClassroomSelects() {
-  const selects = ['adminClassroom', 'reqNewClassroom'];
+  const selects = ['adminClassroom', 'reqNewClassroom', 'editClassroom'];
   selects.forEach(selectId => {
     const sel = document.getElementById(selectId);
     if (!sel) return;
@@ -342,6 +354,7 @@ function populateClassroomSelects() {
 function populateTimeslotSelects() {
   const selects = [
     { id: 'adminTimeslot', hasEmpty: false },
+    { id: 'editTimeslot',  hasEmpty: false },
     { id: 'reqNewTimeslot', hasEmpty: true, emptyText: '— No preference —' },
     { id: 'reqExtraTimeslot', hasEmpty: true, emptyText: '— Select timeslot —' },
   ];
@@ -359,8 +372,67 @@ function populateTimeslotSelects() {
   });
 }
 
+function populateEditModalOptions() {
+  const subSelect = document.getElementById('editSubject');
+  if (subSelect) {
+    subSelect.innerHTML = '';
+    allSubjects.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = `${s.code} - ${s.name} (${s.credits} cr)`;
+      subSelect.appendChild(opt);
+    });
+  }
+
+  const facSelect = document.getElementById('editFaculty');
+  if (facSelect) {
+    facSelect.innerHTML = '';
+    allFaculty.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.email;
+      opt.dataset.name = f.name;
+      opt.textContent = `${f.name} (${f.department})`;
+      facSelect.appendChild(opt);
+    });
+  }
+
+  const roomSelect = document.getElementById('editClassroom');
+  if (roomSelect) {
+    roomSelect.innerHTML = '';
+    allClassrooms.forEach(cr => {
+      const opt = document.createElement('option');
+      opt.value = cr.id;
+      opt.textContent = `${cr.name} (${cr.capacity} seats · ${cr.room_type})`;
+      roomSelect.appendChild(opt);
+    });
+  }
+
+  const tsSelect = document.getElementById('editTimeslot');
+  if (tsSelect) {
+    tsSelect.innerHTML = '';
+    allTimeslots.forEach(ts => {
+      const opt = document.createElement('option');
+      opt.value = ts;
+      opt.textContent = ts;
+      tsSelect.appendChild(opt);
+    });
+  }
+}
+
+function populateAdminWeeklyFacultyFilter() {
+  const sel = document.getElementById('adminWeeklyFacultyFilter');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">All Faculty Members</option>';
+  allFaculty.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f.email;
+    opt.textContent = `${f.name} (${f.department})`;
+    sel.appendChild(opt);
+  });
+}
+
 // ---------------------------------------------------------------------------
-// 1. STUDENT VIEW — 3-DAY TIMETABLE
+// 1. STUDENT VIEW — WEEKLY TIMETABLE GRID & 3-DAY VIEW
 // ---------------------------------------------------------------------------
 function initStudentView() {
   const sectionSelect = document.getElementById('studentSectionSelect');
@@ -368,9 +440,42 @@ function initStudentView() {
     sectionSelect.value = currentUser.section;
   }
 
-  // Remove existing listeners by cloning or just re-assigning handler
-  sectionSelect.onchange = (e) => loadStudentSchedule(e.target.value);
+  sectionSelect.onchange = (e) => {
+    loadStudentWeeklySchedule(studentCurrentWeekDate || new Date().toISOString().split('T')[0]);
+    loadStudentSchedule(e.target.value);
+  };
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  loadStudentWeeklySchedule(todayStr);
   loadStudentSchedule(sectionSelect.value);
+}
+
+async function loadStudentWeeklySchedule(refDate) {
+  const sectionSelect = document.getElementById('studentSectionSelect');
+  const section = sectionSelect ? sectionSelect.value : (currentUser.section || 'MCA A');
+  const label = document.getElementById('studentSectionLabel');
+  if (label) label.textContent = section;
+
+  const container = document.getElementById('studentWeeklyTableContainer');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">Loading weekly timetable...</div>';
+
+  try {
+    const dateParam = refDate ? `&date=${encodeURIComponent(refDate)}` : '';
+    const res = await fetch(`/api/weekly-schedule?section=${encodeURIComponent(section)}${dateParam}`);
+    const data = await res.json();
+
+    studentCurrentWeekDate = data.week_meta.selected_date;
+    const weekLabel = document.getElementById('studentWeekLabel');
+    if (weekLabel) weekLabel.textContent = `📅 ${data.week_meta.label}`;
+
+    const datePicker = document.getElementById('studentDatePicker');
+    if (datePicker) datePicker.value = studentCurrentWeekDate;
+
+    renderWeeklyTimetableGrid('studentWeeklyTableContainer', data, 'Student');
+  } catch (err) {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:#dc2626;">Could not load weekly timetable.</div>';
+  }
 }
 
 async function loadStudentSchedule(section) {
@@ -378,6 +483,7 @@ async function loadStudentSchedule(section) {
   if (label) label.textContent = section;
 
   const grid = document.getElementById('studentDayGrid');
+  if (!grid) return;
   grid.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">Loading 3-day schedule...</div>';
 
   try {
@@ -391,6 +497,7 @@ async function loadStudentSchedule(section) {
 
 function renderStudentDays(days) {
   const grid = document.getElementById('studentDayGrid');
+  if (!grid) return;
   grid.innerHTML = '';
 
   days.forEach((dayData, idx) => {
@@ -433,7 +540,7 @@ function renderStudentDays(days) {
             <div class="class-subject">
               <span class="class-subject-code">${cls.subject_code}</span>${cls.subject_name}
             </div>
-            <div class="class-teacher">👤 ${cls.teacher_name} <span style="color:#94a3b8;font-size:12px;">(${cls.teacher_designation})</span></div>
+            <div class="class-teacher">👤 ${cls.teacher_name} <span style="color:#94a3b8;font-size:12px;">(${cls.teacher_designation || 'Faculty'})</span></div>
             <div class="class-room">
               <span>📍 ${cls.room_name}</span>
             </div>
@@ -455,21 +562,50 @@ function renderStudentDays(days) {
 // 2. FACULTY VIEW — SCHEDULE & REQUESTS
 // ---------------------------------------------------------------------------
 function initFacultyView() {
+  const today = new Date().toISOString().split('T')[0];
+  if (!facultyCurrentWeekDate) facultyCurrentWeekDate = today;
+
   const datePicker = document.getElementById('facultyDatePicker');
-  if (!datePicker.value) {
-    const today = new Date().toISOString().split('T')[0];
+  if (datePicker && !datePicker.value) {
     datePicker.value = today;
   }
-  facultyCurrentDate = datePicker.value;
+  facultyCurrentDate = (datePicker && datePicker.value) ? datePicker.value : today;
 
-  datePicker.onchange = (e) => {
-    facultyCurrentDate = e.target.value;
-    loadFacultySchedule();
-  };
+  if (datePicker) {
+    datePicker.onchange = (e) => {
+      facultyCurrentDate = e.target.value;
+      loadFacultySchedule();
+    };
+  }
 
   setupFacultyRequestForm();
+  loadFacultyWeeklySchedule(facultyCurrentWeekDate);
   loadFacultySchedule();
   loadMyRequestsList();
+}
+
+async function loadFacultyWeeklySchedule(refDate) {
+  const teacherEmail = currentUser ? currentUser.email : '';
+  const container = document.getElementById('facultyWeeklyTableContainer');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">Loading your weekly timetable...</div>';
+
+  try {
+    const dateParam = refDate ? `&date=${encodeURIComponent(refDate)}` : '';
+    const res = await fetch(`/api/weekly-schedule?teacher_email=${encodeURIComponent(teacherEmail)}${dateParam}`);
+    const data = await res.json();
+
+    facultyCurrentWeekDate = data.week_meta.selected_date;
+    const weekLabel = document.getElementById('facultyWeekLabel');
+    if (weekLabel) weekLabel.textContent = `📅 ${data.week_meta.label}`;
+
+    const datePicker = document.getElementById('facultyWeekDatePicker');
+    if (datePicker) datePicker.value = facultyCurrentWeekDate;
+
+    renderWeeklyTimetableGrid('facultyWeeklyTableContainer', data, 'Faculty');
+  } catch (err) {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:#dc2626;">Could not load weekly timetable.</div>';
+  }
 }
 
 async function loadFacultySchedule() {
@@ -549,8 +685,21 @@ function selectClassForChange(cls) {
     </div>
   `;
 
+  // Switch to daily tab view so faculty can submit the change form
+  const dailySec = document.getElementById('facultyDailySection');
+  const weeklySec = document.getElementById('facultyWeeklySection');
+  const btnDaily = document.getElementById('btnFacultyViewDaily');
+  const btnWeekly = document.getElementById('btnFacultyViewWeekly');
+  if (dailySec && dailySec.style.display === 'none') {
+    dailySec.style.display = 'grid';
+    weeklySec.style.display = 'none';
+    if (btnDaily) btnDaily.classList.add('active');
+    if (btnWeekly) btnWeekly.classList.remove('active');
+  }
+
   // Switch request tab to change_request if not already
   switchRequestType('change_request');
+  preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function setupFacultyRequestForm() {
@@ -689,12 +838,14 @@ async function loadMyRequestsList() {
 // 3. ADMIN VIEW A — MANAGE TIMETABLE
 // ---------------------------------------------------------------------------
 function initAdminTimetableView() {
+  const today = new Date().toISOString().split('T')[0];
+  if (!adminCurrentWeekDate) adminCurrentWeekDate = today;
+
   const dateInput = document.getElementById('adminDate');
-  if (!dateInput.value) {
-    const today = new Date().toISOString().split('T')[0];
+  if (dateInput && !dateInput.value) {
     dateInput.value = today;
   }
-  adminCurrentDate = dateInput.value;
+  adminCurrentDate = (dateInput && dateInput.value) ? dateInput.value : today;
   adminCurrentSection = document.getElementById('adminSection').value;
 
   // Chip buttons
@@ -704,7 +855,7 @@ function initAdminTimetableView() {
       const d = new Date();
       d.setDate(d.getDate() + offset);
       const dateStr = d.toISOString().split('T')[0];
-      dateInput.value = dateStr;
+      if (dateInput) dateInput.value = dateStr;
       adminCurrentDate = dateStr;
 
       document.querySelectorAll('.quick-date-buttons .btn-chip').forEach(c => c.classList.remove('active'));
@@ -713,10 +864,12 @@ function initAdminTimetableView() {
     };
   });
 
-  dateInput.onchange = (e) => {
-    adminCurrentDate = e.target.value;
-    refreshAdminDayPreview();
-  };
+  if (dateInput) {
+    dateInput.onchange = (e) => {
+      adminCurrentDate = e.target.value;
+      refreshAdminDayPreview();
+    };
+  }
 
   document.getElementById('adminSection').onchange = (e) => {
     adminCurrentSection = e.target.value;
@@ -729,9 +882,55 @@ function initAdminTimetableView() {
     loadAdminOverviewSchedule(e.target.value);
   };
 
+  const secFilter = document.getElementById('adminWeeklySectionFilter');
+  if (secFilter) {
+    secFilter.onchange = () => loadAdminWeeklySchedule(adminCurrentWeekDate);
+  }
+
+  const facFilter = document.getElementById('adminWeeklyFacultyFilter');
+  if (facFilter) {
+    facFilter.onchange = () => loadAdminWeeklySchedule(adminCurrentWeekDate);
+  }
+
   renderSubjectPicker();
   refreshAdminDayPreview();
+  loadAdminWeeklySchedule(adminCurrentWeekDate);
   loadAdminOverviewSchedule('ALL');
+}
+
+async function loadAdminWeeklySchedule(refDate) {
+  const container = document.getElementById('adminWeeklyTableContainer');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">Loading master weekly timetable...</div>';
+
+  const secFilter = document.getElementById('adminWeeklySectionFilter');
+  const facFilter = document.getElementById('adminWeeklyFacultyFilter');
+  const section = secFilter ? secFilter.value : 'ALL';
+  const facultyEmail = facFilter ? facFilter.value : '';
+
+  try {
+    let url = `/api/weekly-schedule?date=${encodeURIComponent(refDate || adminCurrentWeekDate || new Date().toISOString().split('T')[0])}`;
+    if (section && section !== 'ALL') {
+      url += `&section=${encodeURIComponent(section)}`;
+    }
+    if (facultyEmail) {
+      url += `&teacher_email=${encodeURIComponent(facultyEmail)}`;
+    }
+
+    const res = await fetch(url);
+    const data = await res.json();
+
+    adminCurrentWeekDate = data.week_meta.selected_date;
+    const weekLabel = document.getElementById('adminWeekLabel');
+    if (weekLabel) weekLabel.textContent = `📅 ${data.week_meta.label}`;
+
+    const datePicker = document.getElementById('adminWeekDatePicker');
+    if (datePicker) datePicker.value = adminCurrentWeekDate;
+
+    renderWeeklyTimetableGrid('adminWeeklyTableContainer', data, 'Admin');
+  } catch (err) {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:#dc2626;">Could not load weekly timetable.</div>';
+  }
 }
 
 function renderSubjectPicker() {
@@ -930,13 +1129,12 @@ async function adminAddClass() {
       if (data.has_clash) {
         document.getElementById('adminClashMsg').textContent = data.message;
         document.getElementById('adminClashBanner').style.display = 'flex';
-        showToast('Class added, but a clash was detected (highlighted in red)!', 'error');
+        showToast('Class added, but a clash was detected (highlighted in red)! You can edit it to resolve the conflict.', 'error');
       } else {
         document.getElementById('adminClashBanner').style.display = 'none';
         showToast('Class successfully scheduled!', 'success');
       }
-      refreshAdminDayPreview();
-      loadAdminOverviewSchedule(document.getElementById('adminOverviewFilter').value);
+      refreshAllTimetableViews();
     } else {
       showToast(data.message || 'Could not schedule class', 'error');
     }
@@ -949,13 +1147,17 @@ async function adminAddClass() {
 }
 
 async function deleteScheduleEntry(entryId) {
+  if (!confirm('Are you sure you want to remove this class from the schedule?')) {
+    return;
+  }
   try {
     const res = await fetch(`/api/schedule/${entryId}`, { method: 'DELETE' });
     const data = await res.json();
     if (data.success) {
       showToast('Class removed from schedule', 'info');
-      refreshAdminDayPreview();
-      loadAdminOverviewSchedule(document.getElementById('adminOverviewFilter').value);
+      refreshAllTimetableViews();
+    } else {
+      showToast(data.message || 'Could not remove class', 'error');
     }
   } catch {
     showToast('Failed to delete class', 'error');
@@ -990,7 +1192,7 @@ async function loadAdminOverviewSchedule(filterSection = 'ALL') {
         <td><span style="font-weight:700;color:#2563eb;">${row.section}</span></td>
         <td><span style="font-size:13px;font-weight:600;">${row.timeslot}</span></td>
         <td><strong>${row.subject_name}</strong><br><span style="font-size:11px;color:#94a3b8;">${row.subject_code}</span></td>
-        <td>${row.teacher_name}<br><span style="font-size:11px;color:#94a3b8;">${row.teacher_designation}</span></td>
+        <td>${row.teacher_name}<br><span style="font-size:11px;color:#94a3b8;">${row.teacher_designation || 'Faculty'}</span></td>
         <td>${row.room_name}</td>
         <td>
           ${isClash
@@ -999,11 +1201,15 @@ async function loadAdminOverviewSchedule(filterSection = 'ALL') {
           }
         </td>
         <td>
-          <button class="btn btn-danger-sm" data-id="${row.id}">Remove</button>
+          <div class="action-btn-group">
+            <button class="btn btn-edit-entry" data-id="${row.id}" title="Edit this class">✏️ Edit</button>
+            <button class="btn btn-danger-sm btn-remove-entry" data-id="${row.id}" title="Remove class">Remove</button>
+          </div>
         </td>
       `;
 
-      tr.querySelector('button').addEventListener('click', () => deleteScheduleEntry(row.id));
+      tr.querySelector('.btn-edit-entry').addEventListener('click', () => openEditScheduleModal(row.id));
+      tr.querySelector('.btn-remove-entry').addEventListener('click', () => deleteScheduleEntry(row.id));
       tbody.appendChild(tr);
     });
   } catch {
@@ -1254,4 +1460,531 @@ function showToast(message, type = 'info') {
     toast.style.transition = 'opacity 0.25s ease';
     setTimeout(() => toast.remove(), 250);
   }, 3200);
+}
+
+// ---------------------------------------------------------------------------
+// 6. WEEKLY TIMETABLE GRID RENDERER (SHARED ACROSS STUDENT, FACULTY, ADMIN)
+// ---------------------------------------------------------------------------
+function renderWeeklyTimetableGrid(containerId, weekData, role = 'Student') {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const days = weekData.days || [];
+  const timeslots = weekData.timeslots || [];
+
+  if (days.length === 0 || timeslots.length === 0) {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:#64748b;">No schedule data available for this week.</div>';
+    return;
+  }
+
+  let tableHtml = `
+    <div class="weekly-grid-wrapper">
+      <table class="weekly-grid-table">
+        <thead>
+          <tr>
+            <th class="th-time">Time</th>
+  `;
+
+  days.forEach(d => {
+    const todayClass = d.is_today ? 'is-today' : '';
+    // Format "19 Oct" from formatted string
+    const parts = d.formatted.split(',');
+    const dateShort = parts.length > 1 ? parts[1].trim() : d.date;
+    tableHtml += `
+      <th class="th-day ${todayClass}">
+        <span class="day-name">${d.day_name}</span>
+        <span class="day-date-sub">${dateShort}</span>
+        ${d.is_today ? '<span class="today-badge">TODAY</span>' : ''}
+      </th>
+    `;
+  });
+
+  tableHtml += `
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  timeslots.forEach(ts => {
+    const isLunch = ts.includes('12:15') || ts.toLowerCase().includes('lunch');
+    if (isLunch) {
+      tableHtml += `
+        <tr class="lunch-row">
+          <td class="td-time"><strong>12:15 - 01:00</strong></td>
+          <td colspan="${days.length}" class="lunch-break-cell">
+            <span class="lunch-icon">🍽️</span> <strong>LUNCH BREAK</strong> &nbsp;·&nbsp; (12:15 PM – 01:00 PM)
+          </td>
+        </tr>
+      `;
+    } else {
+      tableHtml += `
+        <tr class="slot-row">
+          <td class="td-time"><strong>${ts}</strong></td>
+      `;
+
+      days.forEach(d => {
+        const slotClasses = (d.classes || []).filter(c => c.timeslot === ts);
+        if (slotClasses.length === 0) {
+          tableHtml += `
+            <td class="td-day-cell empty-cell">
+              <div class="empty-cell-slot">—</div>
+            </td>
+          `;
+        } else {
+          tableHtml += `<td class="td-day-cell">`;
+          slotClasses.forEach(c => {
+            const themeIdx = (c.subject_id || 1) % 6;
+            const hasClash = c.has_clash === 1;
+            const clashClass = hasClash ? 'has-clash-border' : '';
+            const safeReason = escapeHtml(c.clash_reason || 'Timetable Clash detected');
+
+            tableHtml += `
+              <div class="grid-class-card card-theme-${themeIdx} ${clashClass}" data-id="${c.id}">
+                <div class="gcc-header">
+                  <span class="gcc-code">${escapeHtml(c.subject_code)}</span>
+                  <span class="gcc-sec">${escapeHtml(c.section)}</span>
+                  ${hasClash ? `<span class="clash-badge-mini" title="${safeReason}">⚠ CLASH</span>` : ''}
+                </div>
+                <div class="gcc-name" title="${escapeHtml(c.subject_name)}">${escapeHtml(c.subject_name)}</div>
+                <div class="gcc-meta">👤 ${escapeHtml(c.teacher_name)}</div>
+                <div class="gcc-room">📍 ${escapeHtml(c.room_name)}</div>
+                ${hasClash ? `<div class="gcc-clash-msg">⚠️ ${safeReason}</div>` : ''}
+                ${role === 'Admin' ? `
+                  <div class="card-admin-actions">
+                    <button class="btn-card-edit" title="Edit this class" data-id="${c.id}">✏️ Edit</button>
+                    <button class="btn-card-del" title="Remove class" data-id="${c.id}">✕ Del</button>
+                  </div>
+                ` : ''}
+                ${role === 'Faculty' ? `
+                  <div class="gcc-click-hint">👆 Click to request change</div>
+                ` : ''}
+              </div>
+            `;
+          });
+          tableHtml += `</td>`;
+        }
+      });
+
+      tableHtml += `</tr>`;
+    }
+  });
+
+  tableHtml += `
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  container.innerHTML = tableHtml;
+
+  // Bind interactive handlers
+  if (role === 'Admin') {
+    container.querySelectorAll('.btn-card-edit').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        openEditScheduleModal(id);
+      });
+    });
+
+    container.querySelectorAll('.btn-card-del').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        deleteScheduleEntry(id);
+      });
+    });
+  } else if (role === 'Faculty') {
+    container.querySelectorAll('.grid-class-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const id = card.dataset.id;
+        let foundCls = null;
+        for (const d of days) {
+          foundCls = (d.classes || []).find(c => c.id == id);
+          if (foundCls) break;
+        }
+        if (foundCls) {
+          selectClassForChange(foundCls);
+        }
+      });
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 7. WEEKLY NAVIGATION & VIEW TAB SWITCHERS
+// ---------------------------------------------------------------------------
+function setupWeeklyNavigators() {
+  // 1. Student View Toggles & Navigation
+  const btnStudentViewWeekly = document.getElementById('btnStudentViewWeekly');
+  const btnStudentView3Day = document.getElementById('btnStudentView3Day');
+  const studentWeeklyTable = document.getElementById('studentWeeklyTableContainer');
+  const studentDayGrid = document.getElementById('studentDayGrid');
+  const studentWeekNav = document.getElementById('studentWeekNav');
+
+  if (btnStudentViewWeekly && btnStudentView3Day) {
+    btnStudentViewWeekly.addEventListener('click', () => {
+      btnStudentViewWeekly.classList.add('active');
+      btnStudentView3Day.classList.remove('active');
+      if (studentWeeklyTable) studentWeeklyTable.style.display = 'block';
+      if (studentWeekNav) studentWeekNav.style.display = 'flex';
+      if (studentDayGrid) studentDayGrid.style.display = 'none';
+    });
+
+    btnStudentView3Day.addEventListener('click', () => {
+      btnStudentView3Day.classList.add('active');
+      btnStudentViewWeekly.classList.remove('active');
+      if (studentWeeklyTable) studentWeeklyTable.style.display = 'none';
+      if (studentWeekNav) studentWeekNav.style.display = 'none';
+      if (studentDayGrid) studentDayGrid.style.display = 'grid';
+    });
+  }
+
+  const btnStudentPrevWeek = document.getElementById('btnStudentPrevWeek');
+  const btnStudentNextWeek = document.getElementById('btnStudentNextWeek');
+  const btnStudentThisWeek = document.getElementById('btnStudentThisWeek');
+  const studentDatePicker = document.getElementById('studentDatePicker');
+
+  if (btnStudentPrevWeek) {
+    btnStudentPrevWeek.addEventListener('click', () => {
+      const cur = studentCurrentWeekDate || new Date().toISOString().split('T')[0];
+      loadStudentWeeklySchedule(shiftDateByDays(cur, -7));
+    });
+  }
+  if (btnStudentNextWeek) {
+    btnStudentNextWeek.addEventListener('click', () => {
+      const cur = studentCurrentWeekDate || new Date().toISOString().split('T')[0];
+      loadStudentWeeklySchedule(shiftDateByDays(cur, 7));
+    });
+  }
+  if (btnStudentThisWeek) {
+    btnStudentThisWeek.addEventListener('click', () => {
+      loadStudentWeeklySchedule(new Date().toISOString().split('T')[0]);
+    });
+  }
+  if (studentDatePicker) {
+    studentDatePicker.addEventListener('change', (e) => {
+      if (e.target.value) loadStudentWeeklySchedule(e.target.value);
+    });
+  }
+
+  // 2. Faculty View Toggles & Navigation
+  const btnFacultyViewWeekly = document.getElementById('btnFacultyViewWeekly');
+  const btnFacultyViewDaily = document.getElementById('btnFacultyViewDaily');
+  const facultyWeeklySec = document.getElementById('facultyWeeklySection');
+  const facultyDailySec = document.getElementById('facultyDailySection');
+
+  if (btnFacultyViewWeekly && btnFacultyViewDaily) {
+    btnFacultyViewWeekly.addEventListener('click', () => {
+      btnFacultyViewWeekly.classList.add('active');
+      btnFacultyViewDaily.classList.remove('active');
+      if (facultyWeeklySec) facultyWeeklySec.style.display = 'block';
+      if (facultyDailySec) facultyDailySec.style.display = 'none';
+    });
+
+    btnFacultyViewDaily.addEventListener('click', () => {
+      btnFacultyViewDaily.classList.add('active');
+      btnFacultyViewWeekly.classList.remove('active');
+      if (facultyWeeklySec) facultyWeeklySec.style.display = 'none';
+      if (facultyDailySec) facultyDailySec.style.display = 'grid';
+    });
+  }
+
+  const btnFacultyPrevWeek = document.getElementById('btnFacultyPrevWeek');
+  const btnFacultyNextWeek = document.getElementById('btnFacultyNextWeek');
+  const btnFacultyThisWeek = document.getElementById('btnFacultyThisWeek');
+  const facultyWeekDatePicker = document.getElementById('facultyWeekDatePicker');
+
+  if (btnFacultyPrevWeek) {
+    btnFacultyPrevWeek.addEventListener('click', () => {
+      const cur = facultyCurrentWeekDate || new Date().toISOString().split('T')[0];
+      loadFacultyWeeklySchedule(shiftDateByDays(cur, -7));
+    });
+  }
+  if (btnFacultyNextWeek) {
+    btnFacultyNextWeek.addEventListener('click', () => {
+      const cur = facultyCurrentWeekDate || new Date().toISOString().split('T')[0];
+      loadFacultyWeeklySchedule(shiftDateByDays(cur, 7));
+    });
+  }
+  if (btnFacultyThisWeek) {
+    btnFacultyThisWeek.addEventListener('click', () => {
+      loadFacultyWeeklySchedule(new Date().toISOString().split('T')[0]);
+    });
+  }
+  if (facultyWeekDatePicker) {
+    facultyWeekDatePicker.addEventListener('change', (e) => {
+      if (e.target.value) loadFacultyWeeklySchedule(e.target.value);
+    });
+  }
+
+  // 3. Admin View Tabs & Navigation
+  const btnAdminTabWeekly = document.getElementById('btnAdminTabWeekly');
+  const btnAdminTabCreate = document.getElementById('btnAdminTabCreate');
+  const btnAdminTabTable = document.getElementById('btnAdminTabTable');
+  const adminWeeklySec = document.getElementById('adminWeeklySection');
+  const adminCreateSec = document.getElementById('adminCreateSection');
+  const adminTableSec = document.getElementById('adminTableSection');
+
+  function switchAdminTab(activeTab) {
+    [btnAdminTabWeekly, btnAdminTabCreate, btnAdminTabTable].forEach(b => {
+      if (b) b.classList.remove('active');
+    });
+    if (adminWeeklySec) adminWeeklySec.style.display = 'none';
+    if (adminCreateSec) adminCreateSec.style.display = 'none';
+    if (adminTableSec) adminTableSec.style.display = 'none';
+
+    if (activeTab === 'weekly') {
+      if (btnAdminTabWeekly) btnAdminTabWeekly.classList.add('active');
+      if (adminWeeklySec) adminWeeklySec.style.display = 'block';
+      loadAdminWeeklySchedule(adminCurrentWeekDate);
+    } else if (activeTab === 'create') {
+      if (btnAdminTabCreate) btnAdminTabCreate.classList.add('active');
+      if (adminCreateSec) adminCreateSec.style.display = 'block';
+      refreshAdminDayPreview();
+    } else if (activeTab === 'table') {
+      if (btnAdminTabTable) btnAdminTabTable.classList.add('active');
+      if (adminTableSec) adminTableSec.style.display = 'block';
+      const sel = document.getElementById('adminOverviewFilter');
+      loadAdminOverviewSchedule(sel ? sel.value : 'ALL');
+    }
+  }
+
+  if (btnAdminTabWeekly) btnAdminTabWeekly.addEventListener('click', () => switchAdminTab('weekly'));
+  if (btnAdminTabCreate) btnAdminTabCreate.addEventListener('click', () => switchAdminTab('create'));
+  if (btnAdminTabTable) btnAdminTabTable.addEventListener('click', () => switchAdminTab('table'));
+
+  const btnAdminPrevWeek = document.getElementById('btnAdminPrevWeek');
+  const btnAdminNextWeek = document.getElementById('btnAdminNextWeek');
+  const btnAdminThisWeek = document.getElementById('btnAdminThisWeek');
+  const adminWeekDatePicker = document.getElementById('adminWeekDatePicker');
+
+  if (btnAdminPrevWeek) {
+    btnAdminPrevWeek.addEventListener('click', () => {
+      const cur = adminCurrentWeekDate || new Date().toISOString().split('T')[0];
+      loadAdminWeeklySchedule(shiftDateByDays(cur, -7));
+    });
+  }
+  if (btnAdminNextWeek) {
+    btnAdminNextWeek.addEventListener('click', () => {
+      const cur = adminCurrentWeekDate || new Date().toISOString().split('T')[0];
+      loadAdminWeeklySchedule(shiftDateByDays(cur, 7));
+    });
+  }
+  if (btnAdminThisWeek) {
+    btnAdminThisWeek.addEventListener('click', () => {
+      loadAdminWeeklySchedule(new Date().toISOString().split('T')[0]);
+    });
+  }
+  if (adminWeekDatePicker) {
+    adminWeekDatePicker.addEventListener('change', (e) => {
+      if (e.target.value) loadAdminWeeklySchedule(e.target.value);
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 8. EDIT SCHEDULE MODAL & REAL-TIME CLASH DETECTOR
+// ---------------------------------------------------------------------------
+function setupEditScheduleModal() {
+  const modal = document.getElementById('editScheduleModal');
+  const closeBtn = document.getElementById('closeEditModalBtn');
+  const cancelBtn = document.getElementById('btnCancelEditModal');
+  const form = document.getElementById('editScheduleForm');
+
+  if (closeBtn) closeBtn.onclick = closeEditScheduleModal;
+  if (cancelBtn) cancelBtn.onclick = closeEditScheduleModal;
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target.id === 'editScheduleModal') closeEditScheduleModal();
+    });
+  }
+
+  const checkFields = ['editSection', 'editDate', 'editTimeslot', 'editClassroom', 'editFaculty'];
+  checkFields.forEach(fid => {
+    const el = document.getElementById(fid);
+    if (el) el.addEventListener('change', checkEditModalClash);
+  });
+
+  if (form) {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('editScheduleId').value;
+      const section = document.getElementById('editSection').value;
+      const date = document.getElementById('editDate').value;
+      const timeslot = document.getElementById('editTimeslot').value;
+      const subjectId = document.getElementById('editSubject').value;
+      const facultyEmail = document.getElementById('editFaculty').value;
+      const classroomId = document.getElementById('editClassroom').value;
+
+      const facultyObj = allFaculty.find(f => f.email.toLowerCase() === (facultyEmail || '').toLowerCase());
+      const teacherName = facultyObj ? facultyObj.name : '';
+
+      const saveBtn = document.getElementById('btnSaveScheduleEdit');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving Changes...';
+
+      try {
+        const res = await fetch(`/api/schedule/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            section,
+            date,
+            timeslot,
+            subject_id: parseInt(subjectId),
+            classroom_id: parseInt(classroomId),
+            teacher_email: facultyEmail,
+            teacher_name: teacherName
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (data.has_clash) {
+            showToast(`Saved, but conflict detected: ${data.clash_type || 'Clash'}`, 'error');
+          } else {
+            showToast('Schedule successfully updated! Clashes cleared.', 'success');
+          }
+          closeEditScheduleModal();
+          refreshAllTimetableViews();
+        } else {
+          showToast(data.message || 'Failed to update schedule', 'error');
+        }
+      } catch (err) {
+        showToast('Network error while updating schedule', 'error');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '💾 Save Changes';
+      }
+    };
+  }
+}
+
+async function checkEditModalClash() {
+  const id = document.getElementById('editScheduleId').value;
+  const section = document.getElementById('editSection').value;
+  const date = document.getElementById('editDate').value;
+  const timeslot = document.getElementById('editTimeslot').value;
+  const facultyEmail = document.getElementById('editFaculty').value;
+  const classroomId = document.getElementById('editClassroom').value;
+  const banner = document.getElementById('editClashBanner');
+  const msg = document.getElementById('editClashMsg');
+
+  if (!date || !timeslot || !classroomId || !facultyEmail) {
+    if (banner) banner.style.display = 'none';
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/schedule?date=${encodeURIComponent(date)}`);
+    const dayEntries = await res.json();
+    const otherEntries = dayEntries.filter(e => e.id != id && e.timeslot === timeslot);
+
+    const classroomClash = otherEntries.find(e => e.classroom_id == classroomId);
+    const teacherClash = otherEntries.find(e => (e.teacher_email && e.teacher_email.toLowerCase() === facultyEmail.toLowerCase()));
+    const sectionClash = otherEntries.find(e => e.section === section);
+
+    if (classroomClash) {
+      banner.style.display = 'flex';
+      msg.textContent = `Room Clash: ${classroomClash.room_name} is already booked by ${classroomClash.section} (${classroomClash.subject_name})`;
+    } else if (teacherClash) {
+      banner.style.display = 'flex';
+      msg.textContent = `Faculty Clash: ${teacherClash.teacher_name} is already teaching ${teacherClash.section} at this time`;
+    } else if (sectionClash) {
+      banner.style.display = 'flex';
+      msg.textContent = `Section Clash: ${section} already has ${sectionClash.subject_name} scheduled at this time`;
+    } else {
+      banner.style.display = 'none';
+    }
+  } catch {
+    // silent
+  }
+}
+
+async function openEditScheduleModal(scheduleId) {
+  try {
+    const res = await fetch(`/api/schedule/${scheduleId}`);
+    const data = await res.json();
+    if (!data.success || !data.entry) {
+      showToast('Could not load class details', 'error');
+      return;
+    }
+    const entry = data.entry;
+
+    document.getElementById('editScheduleId').value = entry.id;
+    document.getElementById('editSection').value = entry.section;
+    document.getElementById('editDate').value = entry.date;
+    document.getElementById('editTimeslot').value = entry.timeslot;
+
+    // Subject
+    const subSel = document.getElementById('editSubject');
+    if (subSel) subSel.value = entry.subject_id;
+
+    // Faculty
+    const facSel = document.getElementById('editFaculty');
+    if (facSel) {
+      facSel.value = entry.teacher_email || '';
+      if (!facSel.value && entry.teacher_name) {
+        const match = allFaculty.find(f => f.name.toLowerCase() === entry.teacher_name.toLowerCase());
+        if (match) facSel.value = match.email;
+      }
+    }
+
+    // Classroom
+    const roomSel = document.getElementById('editClassroom');
+    if (roomSel) roomSel.value = entry.classroom_id;
+
+    // Clash Banner
+    const banner = document.getElementById('editClashBanner');
+    const msg = document.getElementById('editClashMsg');
+    if (entry.has_clash === 1) {
+      banner.style.display = 'flex';
+      msg.textContent = entry.clash_reason || 'This scheduled class currently has a conflict.';
+    } else {
+      banner.style.display = 'none';
+    }
+
+    document.getElementById('editScheduleModal').style.display = 'flex';
+  } catch {
+    showToast('Failed to open edit dialog', 'error');
+  }
+}
+
+function closeEditScheduleModal() {
+  const modal = document.getElementById('editScheduleModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function shiftDateByDays(dateStr, days) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function refreshAllTimetableViews() {
+  if (currentUser) {
+    if (currentUser.role === 'Student') {
+      loadStudentWeeklySchedule(studentCurrentWeekDate);
+      const sec = document.getElementById('studentSectionSelect');
+      if (sec) loadStudentSchedule(sec.value);
+    } else if (currentUser.role === 'Faculty') {
+      loadFacultyWeeklySchedule(facultyCurrentWeekDate);
+      loadFacultySchedule();
+    } else if (currentUser.role === 'Admin') {
+      loadAdminWeeklySchedule(adminCurrentWeekDate);
+      refreshAdminDayPreview();
+      const overviewFilter = document.getElementById('adminOverviewFilter');
+      if (overviewFilter) loadAdminOverviewSchedule(overviewFilter.value);
+    }
+  }
 }

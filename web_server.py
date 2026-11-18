@@ -416,6 +416,64 @@ def api_delete_schedule(eid):
     c.execute("DELETE FROM schedule WHERE id=?", (eid,)); conn.commit(); conn.close()
     return jsonify({"success": True})
 
+@app.route("/api/schedule/<int:eid>", methods=["GET"])
+def api_get_schedule_entry(eid):
+    conn = get_db()
+    q, params = _full_schedule_query("WHERE s.id=?", [eid])
+    c = conn.cursor()
+    c.execute(q, params)
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"success": False, "message": "Entry not found"}), 404
+    entry = dict(row)
+    return jsonify({"success": True, "entry": entry, **entry})
+
+@app.route("/api/schedule/<int:eid>", methods=["PUT"])
+def api_update_schedule(eid):
+    d             = request.get_json() or {}
+    section       = d.get("section", "MCA A")
+    date_str      = d.get("date", "")
+    timeslot      = d.get("timeslot", "")
+    subject_id    = int(d.get("subject_id", 0))
+    classroom_id  = int(d.get("classroom_id", 0))
+    teacher_name  = d.get("teacher_name", "").strip()
+    teacher_email = d.get("teacher_email", "").strip().lower()
+
+    if not all([date_str, timeslot, subject_id, classroom_id, teacher_name]):
+        return jsonify({"success": False, "message": "All fields including teacher are required"}), 400
+
+    conn = get_db()
+    # Check clash ignoring the current entry ID so it doesn't clash with itself
+    has_clash, clash_type, clash_msg = check_clash(
+        conn, section, date_str, timeslot, teacher_email, classroom_id, ignore_id=eid
+    )
+
+    c = conn.cursor()
+    c.execute("""
+        UPDATE schedule
+        SET section=?, date=?, timeslot=?, subject_id=?, classroom_id=?,
+            teacher_name=?, teacher_email=?, has_clash=?, clash_reason=?
+        WHERE id=?""",
+        (section, date_str, timeslot, subject_id, classroom_id,
+         teacher_name, teacher_email,
+         1 if has_clash else 0, clash_msg if has_clash else None,
+         eid))
+    conn.commit()
+
+    q, params = _full_schedule_query("WHERE s.id=?", [eid])
+    c.execute(q, params)
+    entry = dict(c.fetchone())
+    conn.close()
+
+    return jsonify({
+        "success": True,
+        "entry": entry,
+        "has_clash": has_clash,
+        "clash_type": clash_type,
+        "message": clash_msg if has_clash else "Schedule entry updated successfully!"
+    })
+
 # -----------------------------------------------------------------------
 # Faculty: own day schedule (matched by teacher_email in schedule table)
 # -----------------------------------------------------------------------
@@ -474,6 +532,141 @@ def api_student_schedule():
         result.append({"meta": d, "classes": classes, "has_classes": len(classes) > 0})
     conn.close()
     return jsonify({"section": section, "days": result})
+
+# -----------------------------------------------------------------------
+# Weekly Timetable Grid API (for Faculty, Students & Admin)
+# -----------------------------------------------------------------------
+def seed_week_schedule_if_needed(conn, monday_date):
+    c = conn.cursor()
+    mon_str = monday_date.isoformat()
+    fri_str = (monday_date + timedelta(days=4)).isoformat()
+    c.execute("SELECT COUNT(*) FROM schedule WHERE date >= ? AND date <= ?", (mon_str, fri_str))
+    count = c.fetchone()[0]
+    if count >= 8:
+        return  # already adequately seeded
+
+    blueprint = [
+        # Mon
+        (0, 'MCA A', '09:00 AM - 10:00 AM', 1, 1, 'Dr. Ananya Sharma',   'ananya@college.edu'),
+        (0, 'MCA A', '10:00 AM - 11:00 AM', 2, 2, 'Prof. Ravi Kumar',    'ravi.k@college.edu'),
+        (0, 'MCA A', '11:15 AM - 12:15 PM', 3, 4, 'Ms. Priya Nair',      'priya.nair@college.edu'),
+        (0, 'MCA A', '01:00 PM - 02:00 PM', 4, 3, 'Mr. Arjun Mehta',    'arjun.m@college.edu'),
+        (0, 'MCA B', '09:00 AM - 10:00 AM', 4, 3, 'Mr. Arjun Mehta',    'arjun.m@college.edu'),
+        (0, 'MCA B', '10:00 AM - 11:00 AM', 5, 1, 'Dr. Sunita Rao',     'sunita.rao@college.edu'),
+        (0, 'MCA B', '11:15 AM - 12:15 PM', 1, 2, 'Dr. Ananya Sharma',  'ananya@college.edu'),
+        (0, 'MCA B', '02:00 PM - 03:00 PM', 6, 4, 'Prof. Vikram Joshi', 'vikram.j@college.edu'),
+        # Tue
+        (1, 'MCA A', '09:00 AM - 10:00 AM', 5, 1, 'Dr. Sunita Rao',     'sunita.rao@college.edu'),
+        (1, 'MCA A', '10:00 AM - 11:00 AM', 1, 2, 'Dr. Ananya Sharma',  'ananya@college.edu'),
+        (1, 'MCA A', '01:00 PM - 02:00 PM', 6, 4, 'Prof. Vikram Joshi', 'vikram.j@college.edu'),
+        (1, 'MCA A', '02:00 PM - 03:00 PM', 3, 1, 'Ms. Priya Nair',      'priya.nair@college.edu'),
+        (1, 'MCA B', '09:00 AM - 10:00 AM', 2, 2, 'Prof. Ravi Kumar',    'ravi.k@college.edu'),
+        (1, 'MCA B', '10:00 AM - 11:00 AM', 4, 3, 'Mr. Arjun Mehta',    'arjun.m@college.edu'),
+        (1, 'MCA B', '11:15 AM - 12:15 PM', 5, 1, 'Dr. Sunita Rao',     'sunita.rao@college.edu'),
+        (1, 'MCA B', '01:00 PM - 02:00 PM', 1, 2, 'Dr. Ananya Sharma',  'ananya@college.edu'),
+        # Wed
+        (2, 'MCA A', '09:00 AM - 10:00 AM', 2, 2, 'Prof. Ravi Kumar',    'ravi.k@college.edu'),
+        (2, 'MCA A', '10:00 AM - 11:00 AM', 3, 1, 'Ms. Priya Nair',      'priya.nair@college.edu'),
+        (2, 'MCA A', '11:15 AM - 12:15 PM', 5, 3, 'Dr. Sunita Rao',     'sunita.rao@college.edu'),
+        (2, 'MCA A', '02:00 PM - 03:00 PM', 6, 4, 'Prof. Vikram Joshi', 'vikram.j@college.edu'),
+        (2, 'MCA B', '09:00 AM - 10:00 AM', 1, 1, 'Dr. Ananya Sharma',  'ananya@college.edu'),
+        (2, 'MCA B', '10:00 AM - 11:00 AM', 5, 3, 'Dr. Sunita Rao',     'sunita.rao@college.edu'),
+        (2, 'MCA B', '01:00 PM - 02:00 PM', 3, 4, 'Ms. Priya Nair',      'priya.nair@college.edu'),
+        (2, 'MCA B', '03:15 PM - 04:15 PM', 4, 2, 'Mr. Arjun Mehta',    'arjun.m@college.edu'),
+        # Thu
+        (3, 'MCA A', '09:00 AM - 10:00 AM', 4, 3, 'Mr. Arjun Mehta',    'arjun.m@college.edu'),
+        (3, 'MCA A', '10:00 AM - 11:00 AM', 1, 1, 'Dr. Ananya Sharma',  'ananya@college.edu'),
+        (3, 'MCA A', '01:00 PM - 02:00 PM', 2, 2, 'Prof. Ravi Kumar',    'ravi.k@college.edu'),
+        (3, 'MCA A', '03:15 PM - 04:15 PM', 5, 1, 'Dr. Sunita Rao',     'sunita.rao@college.edu'),
+        (3, 'MCA B', '09:00 AM - 10:00 AM', 3, 4, 'Ms. Priya Nair',      'priya.nair@college.edu'),
+        (3, 'MCA B', '10:00 AM - 11:00 AM', 2, 2, 'Prof. Ravi Kumar',    'ravi.k@college.edu'),
+        (3, 'MCA B', '11:15 AM - 12:15 PM', 1, 1, 'Dr. Ananya Sharma',  'ananya@college.edu'),
+        (3, 'MCA B', '02:00 PM - 03:00 PM', 6, 4, 'Prof. Vikram Joshi', 'vikram.j@college.edu'),
+        # Fri
+        (4, 'MCA A', '09:00 AM - 10:00 AM', 6, 4, 'Prof. Vikram Joshi', 'vikram.j@college.edu'),
+        (4, 'MCA A', '10:00 AM - 11:00 AM', 3, 2, 'Ms. Priya Nair',      'priya.nair@college.edu'),
+        (4, 'MCA A', '11:15 AM - 12:15 PM', 4, 3, 'Mr. Arjun Mehta',    'arjun.m@college.edu'),
+        (4, 'MCA A', '01:00 PM - 02:00 PM', 1, 1, 'Dr. Ananya Sharma',  'ananya@college.edu'),
+        (4, 'MCA B', '09:00 AM - 10:00 AM', 5, 1, 'Dr. Sunita Rao',     'sunita.rao@college.edu'),
+        (4, 'MCA B', '10:00 AM - 11:00 AM', 6, 4, 'Prof. Vikram Joshi', 'vikram.j@college.edu'),
+        (4, 'MCA B', '01:00 PM - 02:00 PM', 2, 2, 'Prof. Ravi Kumar',    'ravi.k@college.edu'),
+        (4, 'MCA B', '02:00 PM - 03:00 PM', 4, 3, 'Mr. Arjun Mehta',    'arjun.m@college.edu'),
+    ]
+
+    for day_idx, section, timeslot, sub_id, room_id, teacher_name, teacher_email in blueprint:
+        d_str = (monday_date + timedelta(days=day_idx)).isoformat()
+        c.execute("SELECT id FROM schedule WHERE section=? AND date=? AND timeslot=?", (section, d_str, timeslot))
+        if not c.fetchone():
+            c.execute("""
+                INSERT INTO schedule (section, date, timeslot, subject_id, classroom_id, teacher_name, teacher_email, created_by, has_clash, clash_reason)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'system_seed', 0, NULL)
+            """, (section, d_str, timeslot, sub_id, room_id, teacher_name, teacher_email))
+    conn.commit()
+
+@app.route("/api/weekly-schedule")
+def api_weekly_schedule():
+    date_param    = request.args.get("date", "").strip()
+    section       = request.args.get("section", "").strip()
+    teacher_email = request.args.get("teacher_email", "").strip().lower()
+
+    if not date_param:
+        ref_date = date.today()
+    else:
+        try:
+            ref_date = datetime.strptime(date_param, "%Y-%m-%d").date()
+        except Exception:
+            ref_date = date.today()
+
+    monday = ref_date - timedelta(days=ref_date.weekday())
+    friday = monday + timedelta(days=4)
+
+    conn = get_db()
+    seed_week_schedule_if_needed(conn, monday)
+
+    days = []
+    for i in range(5):
+        d = monday + timedelta(days=i)
+        days.append({
+            "date": d.isoformat(),
+            "day_name": d.strftime("%A"),
+            "short_day": d.strftime("%a"),
+            "formatted": d.strftime("%d %b"),
+            "full_formatted": d.strftime("%A, %d %b %Y"),
+            "is_today": (d == date.today()),
+        })
+
+    where_clauses = ["s.date >= ?", "s.date <= ?"]
+    params = [monday.isoformat(), friday.isoformat()]
+
+    if section and section != "ALL":
+        where_clauses.append("s.section = ?")
+        params.append(section)
+
+    if teacher_email:
+        where_clauses.append("LOWER(s.teacher_email) = ?")
+        params.append(teacher_email)
+
+    where_sql = "WHERE " + " AND ".join(where_clauses)
+    q, q_params = _full_schedule_query(where_sql, params)
+    c = conn.cursor()
+    c.execute(q, q_params)
+    classes = [dict(r) for r in c.fetchall()]
+    conn.close()
+
+    return jsonify({
+        "week_meta": {
+            "start_date": monday.isoformat(),
+            "end_date": friday.isoformat(),
+            "label": f"Week of {monday.strftime('%d %b')} – {friday.strftime('%d %b %Y')}",
+            "prev_week": (monday - timedelta(days=7)).isoformat(),
+            "next_week": (monday + timedelta(days=7)).isoformat(),
+            "current_week": (date.today() - timedelta(days=date.today().weekday())).isoformat(),
+            "selected_date": ref_date.isoformat(),
+        },
+        "days": days,
+        "timeslots": TIMESLOTS,
+        "classes": classes
+    })
 
 # -----------------------------------------------------------------------
 # Faculty Requests

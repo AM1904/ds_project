@@ -148,47 +148,96 @@
   <main class="portal-main">
 
     <!-- ================================================================
-         STUDENT VIEW — 3-day schedule
+         STUDENT VIEW — Weekly Timetable (Grid & Day View)
          ================================================================ -->
     <section class="view-panel" id="view-student">
       <div class="panel-header">
         <div>
-          <h2>My Class Timetable</h2>
-          <p class="panel-subtitle">Today and the next two days for <strong id="studentSectionLabel">MCA A</strong></p>
+          <div class="header-title-with-icon">
+            <span class="panel-icon">🗓️</span>
+            <div>
+              <h2>Weekly Timetable</h2>
+              <p class="panel-subtitle">Your schedule for this week for <strong id="studentSectionLabel">MCA A</strong></p>
+            </div>
+          </div>
         </div>
-        <div class="section-switch-box">
-          <label for="studentSectionSelect">Viewing:</label>
-          <select id="studentSectionSelect" class="form-control form-control-sm">
-            <option>MCA A</option><option>MCA B</option><option>MCA C</option><option>MCA D</option>
-          </select>
+        <div class="header-controls-cluster">
+          <div class="section-switch-box">
+            <label for="studentSectionSelect">Section:</label>
+            <select id="studentSectionSelect" class="form-control form-control-sm">
+              <option>MCA A</option><option>MCA B</option><option>MCA C</option><option>MCA D</option>
+            </select>
+          </div>
+          <div class="view-toggle-group">
+            <button class="toggle-btn active" id="btnStudentViewWeekly" type="button">📅 Weekly Table</button>
+            <button class="toggle-btn" id="btnStudentView3Day" type="button">📋 3-Day Cards</button>
+          </div>
         </div>
       </div>
-      <div class="three-day-grid" id="studentDayGrid"></div>
+
+      <!-- Weekly Navigation Bar -->
+      <div class="week-nav-bar" id="studentWeekNav">
+        <button class="btn btn-outline btn-sm" id="btnStudentPrevWeek" type="button">◀ Prev Week</button>
+        <span class="week-pill-label" id="studentWeekLabel">📅 Loading week...</span>
+        <button class="btn btn-outline btn-sm" id="btnStudentNextWeek" type="button">Next Week ▶</button>
+        <button class="btn btn-outline btn-sm" id="btnStudentThisWeek" type="button">This Week</button>
+        <input type="date" id="studentDatePicker" class="form-control form-control-sm week-date-picker" title="Jump to date">
+      </div>
+
+      <!-- Main Weekly Timetable Grid Table (Matching user reference design) -->
+      <div class="weekly-timetable-card" id="studentWeeklyTableContainer"></div>
+
+      <!-- Optional 3-Day Card View -->
+      <div class="three-day-grid" id="studentDayGrid" style="display:none; margin-top:20px;"></div>
     </section>
 
 
     <!-- ================================================================
-         FACULTY VIEW — Split: today's schedule left, request form right
+         FACULTY VIEW — Weekly Timetable + Requests
          ================================================================ -->
     <section class="view-panel" id="view-faculty">
       <div class="panel-header">
         <div>
-          <h2>My Teaching Schedule</h2>
-          <p class="panel-subtitle" id="facultyDateLabel">Today's classes and schedule management</p>
+          <div class="header-title-with-icon">
+            <span class="panel-icon">🧑‍🏫</span>
+            <div>
+              <h2>Faculty Teaching Schedule</h2>
+              <p class="panel-subtitle" id="facultyDateLabel">Weekly class schedule and request management</p>
+            </div>
+          </div>
         </div>
-        <div class="section-switch-box">
-          <label for="facultyDatePicker">Date:</label>
-          <input type="date" id="facultyDatePicker" class="form-control form-control-sm">
+        <div class="header-controls-cluster">
+          <div class="view-toggle-group">
+            <button class="toggle-btn active" id="btnFacultyViewWeekly" type="button">📅 Weekly Table</button>
+            <button class="toggle-btn" id="btnFacultyViewDaily" type="button">🗓 Day View &amp; Request Form</button>
+          </div>
         </div>
       </div>
 
-      <div class="faculty-split-layout">
+      <!-- Faculty Weekly Schedule Container -->
+      <div id="facultyWeeklySection">
+        <div class="week-nav-bar" id="facultyWeekNav">
+          <button class="btn btn-outline btn-sm" id="btnFacultyPrevWeek" type="button">◀ Prev Week</button>
+          <span class="week-pill-label" id="facultyWeekLabel">📅 Loading week...</span>
+          <button class="btn btn-outline btn-sm" id="btnFacultyNextWeek" type="button">Next Week ▶</button>
+          <button class="btn btn-outline btn-sm" id="btnFacultyThisWeek" type="button">This Week</button>
+          <input type="date" id="facultyWeekDatePicker" class="form-control form-control-sm week-date-picker" title="Jump to date">
+        </div>
+        <div class="weekly-timetable-card" id="facultyWeeklyTableContainer"></div>
+      </div>
+
+      <!-- Faculty Daily Split Layout (Classes list + Request form) -->
+      <div class="faculty-split-layout" id="facultyDailySection" style="display:none; margin-top:20px;">
 
         <!-- Left: Today's classes -->
         <div class="faculty-schedule-col">
           <div class="col-section-title">
-            <span class="col-icon">🗓</span> My Classes
+            <span class="col-icon">🗓</span> My Classes on Date
             <span class="col-count" id="facultyClassCount">0 classes</span>
+          </div>
+          <div class="section-switch-box" style="margin-bottom:12px;">
+            <label for="facultyDatePicker">Viewing Date:</label>
+            <input type="date" id="facultyDatePicker" class="form-control form-control-sm">
           </div>
           <div id="facultyClassList">
             <!-- Populated by JS -->
@@ -276,114 +325,162 @@
 
 
     <!-- ================================================================
-         ADMIN VIEW A — Manage Timetable (Create + Calendar Overview)
+         ADMIN VIEW A — Manage Timetable (Weekly Grid + Creator + Table)
          ================================================================ -->
     <section class="view-panel" id="view-adminTimetable">
       <div class="panel-header">
         <div>
-          <h2>Manage Class Timetable</h2>
-          <p class="panel-subtitle">Create and view schedules by section and date</p>
-        </div>
-      </div>
-
-      <div class="creator-layout">
-        <!-- Left: creation form -->
-        <div class="creator-form-card">
-
-          <div class="step-box">
-            <div class="step-num">1</div>
-            <div class="step-content">
-              <h3>Select Class &amp; Date</h3>
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label for="adminSection">Class Section</label>
-                  <select id="adminSection" class="form-control">
-                    <option>MCA A</option><option>MCA B</option><option>MCA C</option><option>MCA D</option>
-                  </select>
-                </div>
-                <div class="form-group flex-1">
-                  <label for="adminDate">Date</label>
-                  <input type="date" id="adminDate" class="form-control">
-                </div>
-              </div>
-              <div class="quick-date-buttons">
-                <button class="btn-chip" data-offset="0">Today</button>
-                <button class="btn-chip" data-offset="1">Tomorrow</button>
-                <button class="btn-chip" data-offset="2">Day After</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="step-box">
-            <div class="step-num">2</div>
-            <div class="step-content">
-              <h3>Choose Subject</h3>
-              <p class="step-hint">Click a subject card to select.</p>
-              <div class="subjects-picker-grid" id="adminSubjectPicker"></div>
-              <input type="hidden" id="adminSelectedSubject" value="">
-            </div>
-          </div>
-
-          <div class="step-box">
-            <div class="step-num">3</div>
-            <div class="step-content">
-              <h3>Assign Faculty</h3>
-              <p class="step-hint">Select the teacher for this class from registered faculty accounts.</p>
-              <div class="subjects-picker-grid" id="adminFacultyPicker"></div>
-            </div>
-          </div>
-
-          <div class="step-box">
-            <div class="step-num">4</div>
-            <div class="step-content">
-              <h3>Timeslot &amp; Classroom</h3>
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label for="adminTimeslot">Timeslot</label>
-                  <select id="adminTimeslot" class="form-control"></select>
-                </div>
-                <div class="form-group flex-1">
-                  <label for="adminClassroom">Classroom</label>
-                  <select id="adminClassroom" class="form-control"></select>
-                </div>
-              </div>
-              <div class="clash-alert-banner" id="adminClashBanner" style="display:none;">
-                <span class="clash-icon">⚠️</span>
-                <div class="clash-text">
-                  <strong>Clash Detected!</strong>
-                  <p id="adminClashMsg"></p>
-                </div>
-              </div>
-              <div class="mt-3">
-                <button class="btn btn-primary" id="btnAdminAddClass">
-                  ➕ Add to Timetable
-                </button>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        <!-- Right: day preview -->
-        <div class="creator-preview-card">
-          <div class="preview-header">
+          <div class="header-title-with-icon">
+            <span class="panel-icon">🏛️</span>
             <div>
-              <h3>Day's Timetable</h3>
-              <p class="preview-sub" id="adminPreviewSubtitle">Select a section &amp; date</p>
-            </div>
-            <span class="badge" id="adminPreviewBadge">0 Classes</span>
-          </div>
-          <div class="preview-timeline" id="adminDayTimeline">
-            <div class="empty-preview-state">
-              <span class="empty-preview-icon">📅</span>
-              Select a section and date to view its timetable
+              <h2>Academic Timetable Manager</h2>
+              <p class="panel-subtitle">Create, review, edit, and resolve timetable clashes across all sections and faculty</p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- All schedules table -->
-      <div class="mt-4">
+      <!-- Admin Tab Switcher -->
+      <div class="admin-view-tabs">
+        <button class="admin-tab-btn active" id="btnAdminTabWeekly" type="button">📅 Master Weekly Timetable</button>
+        <button class="admin-tab-btn" id="btnAdminTabCreate" type="button">➕ Schedule New Class</button>
+        <button class="admin-tab-btn" id="btnAdminTabTable" type="button">📋 All Scheduled Classes List</button>
+      </div>
+
+      <!-- 1. Admin Master Weekly Timetable Section -->
+      <div id="adminWeeklySection">
+        <div class="panel-header" style="margin-bottom:14px; background:#fff; padding:16px 20px; border-radius:12px; border:1px solid var(--border);">
+          <div class="header-filters-row">
+            <div class="filter-item">
+              <label for="adminWeeklySectionFilter"><strong>Section:</strong></label>
+              <select id="adminWeeklySectionFilter" class="form-control form-control-sm">
+                <option value="ALL">All Sections</option>
+                <option value="MCA A">MCA A</option>
+                <option value="MCA B">MCA B</option>
+                <option value="MCA C">MCA C</option>
+                <option value="MCA D">MCA D</option>
+              </select>
+            </div>
+            <div class="filter-item">
+              <label for="adminWeeklyFacultyFilter"><strong>Faculty:</strong></label>
+              <select id="adminWeeklyFacultyFilter" class="form-control form-control-sm">
+                <option value="">All Faculty Members</option>
+              </select>
+            </div>
+          </div>
+          <div class="week-nav-bar" id="adminWeekNav" style="margin:0;">
+            <button class="btn btn-outline btn-sm" id="btnAdminPrevWeek" type="button">◀ Prev Week</button>
+            <span class="week-pill-label" id="adminWeekLabel">📅 Loading week...</span>
+            <button class="btn btn-outline btn-sm" id="btnAdminNextWeek" type="button">Next Week ▶</button>
+            <button class="btn btn-outline btn-sm" id="btnAdminThisWeek" type="button">This Week</button>
+            <input type="date" id="adminWeekDatePicker" class="form-control form-control-sm week-date-picker" title="Jump to date">
+          </div>
+        </div>
+
+        <div class="weekly-timetable-card" id="adminWeeklyTableContainer"></div>
+      </div>
+
+      <!-- 2. Admin Creator Section (4-Step Form + Preview) -->
+      <div id="adminCreateSection" style="display:none;">
+        <div class="creator-layout">
+          <!-- Left: creation form -->
+          <div class="creator-form-card">
+
+            <div class="step-box">
+              <div class="step-num">1</div>
+              <div class="step-content">
+                <h3>Select Class &amp; Date</h3>
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label for="adminSection">Class Section</label>
+                    <select id="adminSection" class="form-control">
+                      <option>MCA A</option><option>MCA B</option><option>MCA C</option><option>MCA D</option>
+                    </select>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="adminDate">Date</label>
+                    <input type="date" id="adminDate" class="form-control">
+                  </div>
+                </div>
+                <div class="quick-date-buttons">
+                  <button class="btn-chip" data-offset="0" type="button">Today</button>
+                  <button class="btn-chip" data-offset="1" type="button">Tomorrow</button>
+                  <button class="btn-chip" data-offset="2" type="button">Day After</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="step-box">
+              <div class="step-num">2</div>
+              <div class="step-content">
+                <h3>Choose Subject</h3>
+                <p class="step-hint">Click a subject card to select.</p>
+                <div class="subjects-picker-grid" id="adminSubjectPicker"></div>
+                <input type="hidden" id="adminSelectedSubject" value="">
+              </div>
+            </div>
+
+            <div class="step-box">
+              <div class="step-num">3</div>
+              <div class="step-content">
+                <h3>Assign Faculty</h3>
+                <p class="step-hint">Select the teacher for this class from registered faculty accounts.</p>
+                <div class="subjects-picker-grid" id="adminFacultyPicker"></div>
+              </div>
+            </div>
+
+            <div class="step-box">
+              <div class="step-num">4</div>
+              <div class="step-content">
+                <h3>Timeslot &amp; Classroom</h3>
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label for="adminTimeslot">Timeslot</label>
+                    <select id="adminTimeslot" class="form-control"></select>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="adminClassroom">Classroom</label>
+                    <select id="adminClassroom" class="form-control"></select>
+                  </div>
+                </div>
+                <div class="clash-alert-banner" id="adminClashBanner" style="display:none;">
+                  <span class="clash-icon">⚠️</span>
+                  <div class="clash-text">
+                    <strong>Clash Detected!</strong>
+                    <p id="adminClashMsg"></p>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <button class="btn btn-primary" id="btnAdminAddClass" type="button">
+                    ➕ Add to Timetable
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right: day preview -->
+          <div class="creator-preview-card">
+            <div class="preview-header">
+              <div>
+                <h3>Day's Timetable</h3>
+                <p class="preview-sub" id="adminPreviewSubtitle">Select a section &amp; date</p>
+              </div>
+              <span class="badge" id="adminPreviewBadge">0 Classes</span>
+            </div>
+            <div class="preview-timeline" id="adminDayTimeline">
+              <div class="empty-preview-state">
+                <span class="empty-preview-icon">📅</span>
+                Select a section and date to view its timetable
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. All schedules table (with both Edit and Remove buttons) -->
+      <div id="adminTableSection" style="display:none; margin-top:20px;">
         <div class="panel-header" style="margin-bottom:16px;">
           <h3 style="font-size:17px;font-weight:700;">All Scheduled Classes</h3>
           <select id="adminOverviewFilter" class="form-control form-control-sm" style="width:auto;">
@@ -394,7 +491,7 @@
         <div class="overview-table-card">
           <table class="simple-table">
             <thead>
-              <tr><th>Date</th><th>Section</th><th>Timeslot</th><th>Subject</th><th>Teacher</th><th>Room</th><th>Status</th><th>Action</th></tr>
+              <tr><th>Date</th><th>Section</th><th>Timeslot</th><th>Subject</th><th>Teacher</th><th>Room</th><th>Status</th><th>Actions</th></tr>
             </thead>
             <tbody id="adminOverviewBody"></tbody>
           </table>
@@ -480,6 +577,76 @@
         <div class="modal-footer">
           <button type="submit" class="btn btn-primary">Save Changes</button>
           <button type="button" class="btn btn-outline" id="modalLogoutBtn">Sign Out</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================
+     EDIT SCHEDULE MODAL (Admin)
+     ======================================================================== -->
+<div class="modal-backdrop" id="editScheduleModal" style="display:none;">
+  <div class="modal-card modal-card-md">
+    <div class="modal-header">
+      <div class="modal-title-box">
+        <span class="modal-icon">✏️</span>
+        <div>
+          <h3>Edit Scheduled Class</h3>
+          <p class="modal-subtitle" style="font-size:12px; color:var(--text-sec); margin:0;">Modify section, date, timeslot, classroom, or resolve clashes</p>
+        </div>
+      </div>
+      <button class="modal-close-btn" id="closeEditModalBtn" type="button">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="editScheduleForm">
+        <input type="hidden" id="editScheduleId">
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="editSection">Class Section <span class="required-star">*</span></label>
+            <select id="editSection" class="form-control" required>
+              <option>MCA A</option><option>MCA B</option><option>MCA C</option><option>MCA D</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label for="editDate">Date <span class="required-star">*</span></label>
+            <input type="date" id="editDate" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="editSubject">Subject <span class="required-star">*</span></label>
+          <select id="editSubject" class="form-control" required></select>
+        </div>
+
+        <div class="form-group">
+          <label for="editFaculty">Faculty / Teacher <span class="required-star">*</span></label>
+          <select id="editFaculty" class="form-control" required></select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="editTimeslot">Timeslot <span class="required-star">*</span></label>
+            <select id="editTimeslot" class="form-control" required></select>
+          </div>
+          <div class="form-group flex-1">
+            <label for="editClassroom">Classroom <span class="required-star">*</span></label>
+            <select id="editClassroom" class="form-control" required></select>
+          </div>
+        </div>
+
+        <div class="clash-alert-banner" id="editClashBanner" style="display:none; margin: 12px 0;">
+          <span class="clash-icon">⚠️</span>
+          <div class="clash-text">
+            <strong>Timetable Clash Warning</strong>
+            <p id="editClashMsg"></p>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="margin-top:20px; padding-top:16px;">
+          <button type="submit" class="btn btn-primary" id="btnSaveScheduleEdit">💾 Save Changes</button>
+          <button type="button" class="btn btn-outline" id="btnCancelEditModal">Cancel</button>
         </div>
       </form>
     </div>
