@@ -143,8 +143,6 @@ export function EntryForm({ refs, value: v, onChange, entry, version = 0, submit
     return binarySearchBestFit(availableRooms, strength);
   }, [v.section, v.timeslot, availableRooms, strength]);
 
-  const selectedRoom = refs.classrooms.find(c => String(c.id) === v.classroomId);
-
   // Auto-suggest best fit classroom when section + timeslot are chosen and no classroom is selected yet
   useEffect(() => {
     if (v.section && v.timeslot && !v.classroomId && suggestedRoom) {
@@ -196,9 +194,7 @@ export function EntryForm({ refs, value: v, onChange, entry, version = 0, submit
     <form className="adm-form" onSubmit={submit} noValidate>
       <div className="adm-grid">
         <div className="field">
-          <label htmlFor="ef-section">
-            Section {v.section && strength > 0 && <span className="pill pill-ok" style={{ fontSize: '0.72rem', padding: '1px 6px', marginLeft: '6px' }}>{strength} students</span>}
-          </label>
+          <label htmlFor="ef-section">Section</label>
           <select className="select" {...a11y('section', 'ef-section')} value={v.section} onChange={e => onChange({ section: e.target.value })}>
             <option value="">Select section</option>
             {refs.sections.map(s => {
@@ -242,20 +238,7 @@ export function EntryForm({ refs, value: v, onChange, entry, version = 0, submit
           {err('timeslot', 'ef-timeslot')}
         </div>
         <div className="field">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-            <label htmlFor="ef-room" style={{ margin: 0 }}>Classroom</label>
-            {suggestedRoom && (
-              <button
-                type="button"
-                className="pill pill-ok"
-                style={{ cursor: 'pointer', border: 'none', background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 600 }}
-                onClick={() => onChange({ classroomId: String(suggestedRoom.id) })}
-                title={`Quick Sort + Binary Search found ${suggestedRoom.name} (${suggestedRoom.capacity} seats) as Best Fit for ${v.section} (${strength} students), leaving ${suggestedRoom.capacity - strength} unused seats.`}
-              >
-                ★ Best Fit: {suggestedRoom.name} ({suggestedRoom.capacity - strength} unused)
-              </button>
-            )}
-          </div>
+          <label htmlFor="ef-room">Classroom</label>
           <select className="select" {...a11y('classroomId', 'ef-room')} value={v.classroomId} onChange={e => onChange({ classroomId: e.target.value })}>
             <option value="">Select classroom</option>
             {sortedClassrooms.map(c => {
@@ -267,9 +250,9 @@ export function EntryForm({ refs, value: v, onChange, entry, version = 0, submit
                 annot = ' (booked)';
               } else if (v.section) {
                 if (isBest) {
-                  annot = ` — ★ Best Fit (${unused} unused seats for ${v.section}: ${strength})`;
+                  annot = ` — ★ Best Fit (${unused} unused seats)`;
                 } else if (c.capacity < strength) {
-                  annot = ` — ⚠️ Under-capacity (has ${c.capacity}, needs ${strength})`;
+                  annot = ` — ⚠️ Under-capacity (${c.capacity}/${strength})`;
                 } else {
                   annot = ` — (${unused} unused seats)`;
                 }
@@ -281,19 +264,6 @@ export function EntryForm({ refs, value: v, onChange, entry, version = 0, submit
               );
             })}
           </select>
-          {selectedRoom && v.section && (
-            <p className="help" style={{ marginTop: '4px', fontSize: '0.8rem' }}>
-              {selectedRoom.capacity >= strength ? (
-                <span style={{ color: '#16a34a' }}>
-                  ✓ <strong>{selectedRoom.name}</strong> ({selectedRoom.capacity} seats) accommodates <strong>{v.section}</strong> ({strength} students) with <strong>{selectedRoom.capacity - strength}</strong> unused seats.
-                </span>
-              ) : (
-                <span style={{ color: '#dc2626' }}>
-                  ⚠️ <strong>Under-capacity:</strong> {selectedRoom.name} ({selectedRoom.capacity} seats) cannot fit {v.section} ({strength} students) — shortfall of {strength - selectedRoom.capacity} seats.
-                </span>
-              )}
-            </p>
-          )}
           {err('classroomId', 'ef-room')}
         </div>
       </div>
