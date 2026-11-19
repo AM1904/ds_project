@@ -17,7 +17,7 @@ from data_models import Course, Classroom, Teacher
 from searching import linear_search, binary_search
 from sorting import insertion_sort, merge_sort, quick_sort
 from analysis import display_conceptual_comparison, run_empirical_benchmark
-from workflow import prioritize_courses_by_hours, allocate_rooms_best_fit, audit_teacher_allocation
+from workflow import prioritize_courses_by_hours, allocate_rooms_best_fit, suggest_best_fit_room, audit_teacher_allocation
 
 
 def banner():
@@ -107,28 +107,45 @@ def demo_workflow():
     for rank, c in enumerate(prioritized, 1):
         print(f"     Priority #{rank}: {c.name:<20} ({c.hours_per_week} hrs/week)")
 
-    # Workflow 2: Best-Fit Room Allocation
+    # Workflow 2: Best-Fit Room Allocation (Quick Sort + Binary Search)
+    # Real campus classrooms (portal_data.db):
     classrooms = [
-        Classroom(201, "Auditorium-A", 100),
-        Classroom(202, "Lecture-B1", 45),
-        Classroom(203, "Seminar-C2", 25),
-        Classroom(204, "Hall-D3", 60),
+        Classroom(1, "Room A-101", 60),
+        Classroom(2, "Room B-202", 45),
+        Classroom(3, "Room C-303", 30),
+        Classroom(4, "Systems Lab-1", 25),
     ]
+
+    # Section Strengths: MCA A (42 students), MCA B (36 students)
     enrollments = [
-        (Course(101, "Data Structures", "Dr. Ananya", 4), 22),
-        (Course(102, "Operating Systems", "Prof. Ravi", 3), 40),
-        (Course(105, "Advanced AI", "Dr. Sunita", 5), 58),
+        (Course(101, "MCA A: Data Structures", "Dr. Ananya Sharma", 4), 42),
+        (Course(102, "MCA B: Operating Systems", "Prof. Ravi Kumar", 3), 36),
     ]
 
     print("\n  >> Workflow B: Best-Fit Classroom Allocation (Quick Sort + Binary Search):")
     sorted_rooms, allocations = allocate_rooms_best_fit(classrooms, enrollments)
-    print("     Classrooms sorted by capacity: " + ", ".join(f"{r.room_number}({r.capacity})" for r in sorted_rooms))
+    print("     Classrooms sorted in ascending order of capacity (Quick Sort):")
+    print("     " + " -> ".join(f"{r.room_number} ({r.capacity} seats)" for r in sorted_rooms))
+
+    print("\n     Binary Search Best-Fit Allocations (minimizing unused seats):")
     for alloc in allocations:
         c = alloc["course"]
         r = alloc["allocated_room"]
-        print(f"     Course: {c.name:<18} | Students: {alloc['students']:<2} -> "
-              f"Allocated: {r.room_number} (Cap {r.capacity}) | "
-              f"Unused Seats: {alloc['waste_seats']:<2} | Binary Search Comps: {alloc['search_comparisons']}")
+        print(f"     Course: {c.name:<25} | Strength: {alloc['students']} students -> "
+              f"Suggested Room: {r.room_number} ({r.capacity} seats) | "
+              f"Unused Seats: {alloc['waste_seats']} | Comparisons: {alloc['search_comparisons']}")
+
+    # Dynamic Scenario: Room B-202 is booked at a timeslot (e.g. 09:00 AM)
+    print("\n  >> Workflow B2: Dynamic Available Room Suggestion under Slot Conflict:")
+    print("     Scenario: Room B-202 is already booked by MCA A at 09:00 AM - 10:00 AM.")
+    available_rooms = [r for r in classrooms if r.room_number != "Room B-202"]
+    print("     Available Rooms: " + ", ".join(f"{r.room_number} ({r.capacity} seats)" for r in available_rooms))
+
+    # Suggest room for MCA B (36 students) among remaining available rooms
+    alt_room, alt_waste, alt_comps = suggest_best_fit_room(available_rooms, 36)
+    print(f"     MCA B (36 students) Suggestion among available:")
+    print(f"     -> Suggested: {alt_room.room_number} ({alt_room.capacity} seats) | "
+          f"Unused Seats: {alt_waste} | Comparisons: {alt_comps} (Binary Search)")
 
 
 def demo_analysis():

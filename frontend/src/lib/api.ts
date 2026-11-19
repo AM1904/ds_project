@@ -1,6 +1,6 @@
 import type {
   Availability, Classroom, EntryPayload, EntryResult, FacultyRequest, FacultyUser,
-  ScheduleEntry, Subject, User, WeekData, RequestType,
+  ScheduleEntry, Subject, User, WeekData, RequestType, RoomSuggestionResult,
 } from './types';
 
 export class ApiError extends Error {
@@ -72,6 +72,13 @@ export const api = {
   deleteEntry: (id: number) => call<{ success: boolean }>('DELETE', `/api/schedule/${id}`),
   availability: (p: { date: string; section: string; teacher_email?: string }) =>
     get<Availability>(`/api/availability${qs(p)}`),
+  suggestClassroom: (p: { section?: string; date?: string; timeslot?: string; ignore_id?: number }) =>
+    get<RoomSuggestionResult>(`/api/classrooms/suggest${qs({
+      section: p.section,
+      date: p.date,
+      timeslot: p.timeslot,
+      ignore_id: p.ignore_id ? String(p.ignore_id) : undefined,
+    })}`),
 
   // requests
   requests: (p: { status?: string; faculty_email?: string } = {}) =>

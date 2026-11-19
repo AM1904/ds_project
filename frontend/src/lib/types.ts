@@ -57,3 +57,25 @@ export interface EntryResult {
 }
 export interface SlotAvailability { section_busy: boolean; teacher_busy: boolean; busy_rooms: number[] }
 export interface Availability { slots: Record<string, SlotAvailability> }
+
+export const SECTION_STRENGTHS: Record<string, number> = {
+  'MCA A': 42,
+  'MCA B': 36,
+  'MCA C': 40,
+  'MCA D': 35,
+};
+
+export interface RoomSuggestionResult {
+  success: boolean;
+  section: string;
+  strength: number;
+  suggested_classroom: Classroom | null;
+  unused_seats: number | null;
+  available_classrooms: Array<Classroom & { is_best_fit: boolean; unused_seats: number; fits: boolean }>;
+  algorithm: {
+    name: string;
+    sorting: string;
+    searching: string;
+    objective: string;
+  };
+}

@@ -47,6 +47,21 @@ def allocate_rooms_best_fit(classrooms: list[Classroom], course_enrollments: lis
     return sorted_rooms, allocations
 
 
+def suggest_best_fit_room(available_rooms: list[Classroom], student_count: int):
+    """
+    Given currently available (unbooked) classrooms:
+    1. Sorts classrooms in ascending order of seating capacity via Quick Sort.
+    2. Identifies the smallest classroom accommodating student_count via Binary Search.
+    Minimizes unused seating capacity.
+    """
+    if not available_rooms:
+        return None, None, 0
+    sorted_rooms, _, _ = quick_sort(available_rooms, key_func=lambda r: r.capacity)
+    idx, room, comps = binary_search_best_fit(sorted_rooms, student_count, capacity_func=lambda r: r.capacity)
+    waste = (room.capacity - student_count) if room else None
+    return room, waste, comps
+
+
 def audit_teacher_allocation(teachers: list[Teacher], target_subject: str):
     """
     Uses Linear Search to locate teachers by specialized subject.

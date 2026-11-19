@@ -4,7 +4,7 @@ import { useBadges } from '../../context/Badges';
 import { useToast } from '../../context/Toast';
 import { api, ApiError } from '../../lib/api';
 import { formatDay, isWeekend, todayISO, toWeekday } from '../../lib/dates';
-import type { Availability, Classroom, RequestType, ScheduleEntry } from '../../lib/types';
+import { SECTION_STRENGTHS, type Availability, type Classroom, type RequestType, type ScheduleEntry } from '../../lib/types';
 
 interface Props {
   type: RequestType;
@@ -138,7 +138,10 @@ export function RequestForm({ type, onType, canExtra, selected, onSent }: Props)
         <div className="field">
           <label htmlFor="fac-section">Section</label>
           <select id="fac-section" className="select" value={section} onChange={e => setSection(e.target.value)}>
-            {sections.map(s => <option key={s} value={s}>{s}</option>)}
+            {sections.map(s => {
+              const cap = SECTION_STRENGTHS[s];
+              return <option key={s} value={s}>{s}{cap ? ` (${cap} students)` : ''}</option>;
+            })}
           </select>
         </div>
       ) : (
@@ -146,7 +149,15 @@ export function RequestForm({ type, onType, canExtra, selected, onSent }: Props)
           <label htmlFor="fac-room">New classroom (optional)</label>
           <select id="fac-room" className="select" value={room} onChange={e => setRoom(e.target.value)}>
             <option value="">Keep current</option>
-            {rooms.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+            {rooms.map(r => {
+              const reqStrength = selected?.section ? (SECTION_STRENGTHS[selected.section] ?? 40) : 0;
+              const capInfo = reqStrength > 0 ? (
+                r.capacity >= reqStrength
+                  ? ` (${r.capacity} seats — ${r.capacity - reqStrength} unused)`
+                  : ` (${r.capacity} seats — ⚠️ Under-capacity)`
+              ) : ` (${r.capacity} seats)`;
+              return <option key={r.id} value={r.name}>{r.name}{capInfo}</option>;
+            })}
           </select>
         </div>
       )}

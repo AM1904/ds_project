@@ -10,11 +10,17 @@ Teacher data comes from REGISTERED FACULTY ACCOUNTS in the users table.
 No hardcoded teachers in subjects — subjects are just courses; teachers are assigned per schedule slot.
 """
 import os
+import sys
 import sqlite3
 from datetime import datetime, date, timedelta
 from flask import Flask, request, jsonify, send_from_directory, session
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
+from phase3.sorting import quick_sort
+from phase3.searching import binary_search_best_fit
 DB_FILE  = os.path.join(BASE_DIR, "portal_data.db")
 
 DIST_DIR = os.path.join(BASE_DIR, "frontend", "dist")
@@ -313,12 +319,95 @@ def api_subjects():
     rows = [dict(r) for r in c.fetchall()]; conn.close()
     return jsonify(rows)
 
+# -----------------------------------------------------------------------
+# Best-Fit Classroom Allocation (Quick Sort + Binary Search)
+# -----------------------------------------------------------------------
+SECTION_STRENGTH = {
+    "MCA A": 42,
+    "MCA B": 36,
+    "MCA C": 40,
+    "MCA D": 35,
+}
+
+def suggest_best_fit_classroom(available_rooms, section_or_strength):
+    """
+    Classroom Best-Fit Allocation using Quick Sort and Binary Search:
+    1. Quick Sort: Sorts available classrooms in ascending order of seating capacity.
+    2. Binary Search: Identifies the smallest classroom capable of accommodating the required strength.
+    Minimizes unused seating capacity.
+    """
+    if isinstance(section_or_strength, int):
+        strength = section_or_strength
+    else:
+        strength = SECTION_STRENGTH.get(section_or_strength, 40)
+
+    if not available_rooms:
+        return None, 0, strength, []
+
+    # Quick Sort: classrooms sorted in ascending order of seating capacity
+    sorted_rooms, comps, swaps = quick_sort(available_rooms, key_func=lambda r: r["capacity"])
+
+    # Binary Search identifies smallest room capable of accommodating strength
+    idx, best_room, bs_comps = binary_search_best_fit(
+        sorted_rooms, strength, capacity_func=lambda r: r["capacity"]
+    )
+    waste = (best_room["capacity"] - strength) if best_room else None
+    return best_room, waste, strength, sorted_rooms
+
 @app.route("/api/classrooms")
 def api_classrooms():
     conn = get_db(); c = conn.cursor()
-    c.execute("SELECT * FROM classrooms ORDER BY capacity DESC")
-    rows = [dict(r) for r in c.fetchall()]; conn.close()
-    return jsonify(rows)
+    c.execute("SELECT * FROM classrooms")
+    raw_rooms = [dict(r) for r in c.fetchall()]; conn.close()
+    # Sort in ascending order of seating capacity using Quick Sort
+    sorted_rooms, _, _ = quick_sort(raw_rooms, key_func=lambda r: r["capacity"])
+    return jsonify(sorted_rooms)
+
+@app.route("/api/classrooms/suggest")
+def api_suggest_classroom():
+    section = request.args.get("section", "").strip()
+    date_str = request.args.get("date", "").strip()
+    timeslot = request.args.get("timeslot", "").strip()
+    ignore_id = request.args.get("ignore_id", type=int)
+
+    strength = SECTION_STRENGTH.get(section, 40)
+    conn = get_db()
+    all_rooms = [dict(r) for r in conn.execute("SELECT * FROM classrooms").fetchall()]
+
+    busy_ids = set()
+    if date_str and timeslot:
+        cur = conn.execute("SELECT classroom_id, id FROM schedule WHERE date=? AND timeslot=?", (date_str, timeslot))
+        for r in cur.fetchall():
+            if ignore_id and r["id"] == ignore_id:
+                continue
+            busy_ids.add(r["classroom_id"])
+    conn.close()
+
+    available = [r for r in all_rooms if r["id"] not in busy_ids]
+    best_room, waste, strength, sorted_rooms = suggest_best_fit_classroom(available, strength)
+
+    return jsonify({
+        "success": True,
+        "section": section,
+        "strength": strength,
+        "suggested_classroom": best_room,
+        "unused_seats": waste,
+        "available_classrooms": [
+            {
+                **r,
+                "is_best_fit": (best_room is not None and r["id"] == best_room["id"]),
+                "unused_seats": r["capacity"] - strength,
+                "fits": r["capacity"] >= strength
+            }
+            for r in sorted_rooms
+        ],
+        "algorithm": {
+            "name": "Best-Fit Classroom Allocation",
+            "sorting": "Quick Sort (ascending capacity)",
+            "searching": "Binary Search Best-Fit (O(log n))",
+            "objective": "Minimize unused seating capacity"
+        }
+    })
 
 @app.route("/api/timeslots")
 def api_timeslots(): return jsonify(TIMESLOTS)
@@ -919,12 +1008,21 @@ def api_resolve_request(rid):
             has_clash, _, msg = check_clash(conn, section, req_date, req_slot, email, 0, teacher_name=req_row["faculty_name"])
             if has_clash:
                 return refuse(f"Cannot approve, it would clash. {msg}")
-            chosen_room = None
-            for r in c.execute("SELECT id FROM classrooms ORDER BY capacity DESC").fetchall():
-                if not check_clash(conn, section, req_date, req_slot, email, r["id"], teacher_name=req_row["faculty_name"])[0]:
-                    chosen_room = r["id"]; break
-            if chosen_room is None:
+            # Best-Fit classroom allocation using Quick Sort + Binary Search
+            all_rooms = [dict(r) for r in c.execute("SELECT * FROM classrooms").fetchall()]
+            free_rooms = [
+                r for r in all_rooms
+                if not check_clash(conn, section, req_date, req_slot, email, r["id"], teacher_name=req_row["faculty_name"])[0]
+            ]
+            if not free_rooms:
                 return refuse("Cannot approve: no classroom is free at that time.")
+            best_room, waste, strength, _ = suggest_best_fit_classroom(free_rooms, section)
+            if best_room is None:
+                # If no single room accommodates full strength, select largest free room
+                sorted_free, _, _ = quick_sort(free_rooms, key_func=lambda r: r["capacity"], reverse=True)
+                chosen_room = sorted_free[0]["id"]
+            else:
+                chosen_room = best_room["id"]
             created_id = c.execute("""
                 INSERT INTO schedule (section, date, timeslot, subject_id, classroom_id,
                                       teacher_name, teacher_email, created_by, has_clash, clash_reason)
